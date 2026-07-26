@@ -67,6 +67,7 @@ void log_set_quiet(bool enable);
 int log_add_callback(log_log_cb fn, void *udata, int level);
 int log_add_fp(FILE *fp, int level);
 int log_add_rotate_file(const char *path, int level, size_t size, size_t n);
+void log_clear_callbacks(void);
 
 void log_data(const char *fmt, ...);
 void log_output(int min_verbosity, const char *fmt, ...);

@@ -31,6 +31,8 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #define _AMD64_
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <debugapi.h>
 #include <winsock2.h>
 #else
@@ -130,25 +132,27 @@ static int rotate_files(log_event_t* ev) {
     char src[LOG_MAX_FILE_NAME_SIZE + 4] = {0};
     char dst[LOG_MAX_FILE_NAME_SIZE + 4] = {0};
     fclose(ev->udata);
+
     for (int i = (int)L.max_file_count; i > 0; i--) {
         backup_file_name(L.filename, i - 1, src, sizeof(src));
         backup_file_name(L.filename, i, dst, sizeof(dst));
         printf("src: %s\n", src);
         printf("dst: %s\n", dst);
-        if (is_file_exist(dst)) {
-            if (remove(dst) != 0) {
-                fprintf(stderr, "ERROR: logger: Failed to remove file: `%s`\n", dst);
-            }
-        }
-
         if (is_file_exist(src)) {
+            /* Remove destination first (rename() on Windows fails if
+             * the destination file exists). */
+            if (is_file_exist(dst)) {
+                if (remove(dst) != 0) {
+                    fprintf(stderr, "ERROR: logger: Failed to remove file: `%s`\n", dst);
+                }
+            }
             if (rename(src, dst) != 0) {
                 fprintf(stderr, "ERROR: logger: Failed to rename file: `%s` -> `%s`\n", src, dst);
             }
         }
     }
 
-    ev->udata = fopen(L.filename, "a");
+    ev->udata = fopen(L.filename, "ab");
     if (ev->udata == NULL) {
         fprintf(stderr, "ERROR: logger: Failed to open file: `%s`\n", ev->file);
         return 1;
@@ -316,6 +320,17 @@ int log_add_callback(log_log_cb fn, void* udata, int level) {
     return -1;
 }
 
+void log_clear_callbacks(void) {
+    lock();
+    for (int i = 0; i < MAX_CALLBACKS; i++) {
+        L.callbacks[i].fn = NULL;
+        L.callbacks[i].udata = NULL;
+        L.callbacks[i].level = 0;
+    }
+    L.callback_count = 0;
+    unlock();
+}
+
 int log_add_fp(FILE* fp, int level) {
     return log_add_callback(file_callback, fp, level);
 }
@@ -325,7 +340,10 @@ int log_add_rotate_file(const char* path, int level,size_t size, size_t n) {
     L.max_file_size = size;
     L.max_file_count = n;
 
-    FILE* fp = fopen(path, "a");
+    FILE* fp = fopen(path, "ab");
+    if (fp == NULL) {
+        return -1;
+    }
     L.current_file_size = file_size(fp);
 
     return log_add_callback(rotate_file_callback, fp, level);

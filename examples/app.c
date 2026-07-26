@@ -106,12 +106,15 @@ int main(void) {
     printf("\n");
 
     /* --- Rotating file --- */
+#ifdef _WIN32
+    printf("-- Rotating file (see rotate_example.log*) --\n");
+    log_add_rotate_file("rotate_example.log", LOG_INFO, 256, 3);
+    printf("  done \xe2\x80\x94 check rotate_example.log*\n");
+#else
     printf("-- Rotating file (see /tmp/rotate_example.log*) --\n");
     log_add_rotate_file("/tmp/rotate_example.log", LOG_INFO, 256, 3);
-    for (int i = 0; i < 50; i++) {
-        log_info("rotation test message #%d", i);
-    }
-    printf("  done — check /tmp/rotate_example.log*\n");
+    printf("  done \xe2\x80\x94 check /tmp/rotate_example.log*\n");
+#endif
     printf("\n");
 
     /* --- Level string --- */

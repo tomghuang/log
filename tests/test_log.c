@@ -12,7 +12,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include <io.h>
+#include <process.h>
+#endif
 
 /* ------------------------------------------------------------------
  * Capture callback — stores the last event for inspection
@@ -90,7 +95,11 @@ static char *slurp_file(const char *path) {
 static const char *tmp_path(void) {
     static int counter = 0;
     static char buf[128];
+#ifdef _WIN32
+    snprintf(buf, sizeof(buf), "log_test_%d_%d.log", (int)getpid(), counter++);
+#else
     snprintf(buf, sizeof(buf), "/tmp/log_test_%d_%d.log", (int)getpid(), counter++);
+#endif
     return buf;
 }
 
@@ -358,6 +367,8 @@ static MunitResult test_add_fp(const MunitParameter params[],
     FILE *fp = fopen(fp_path, "w");
     munit_assert_not_null(fp);
 
+    log_clear_callbacks();
+    g_capture_installed = 0;
     int rc = log_add_fp(fp, LOG_INFO);
     munit_assert_int(rc, ==, 0);
 
@@ -481,6 +492,8 @@ static MunitResult test_rotate_file(const MunitParameter params[],
      *   base_path.1     – older messages
      *   base_path.2     – oldest messages
      */
+    log_clear_callbacks();
+    g_capture_installed = 0;
     int rc = log_add_rotate_file(base_path, LOG_INFO, 128, 2);
     munit_assert_int(rc, ==, 0);
 
@@ -539,6 +552,8 @@ static MunitResult test_rotate_count_1(const MunitParameter params[],
 
     const char *base_path = tmp_path();
 
+    log_clear_callbacks();
+    g_capture_installed = 0;
     int rc = log_add_rotate_file(base_path, LOG_INFO, 64, 1);
     munit_assert_int(rc, ==, 0);
 
@@ -584,6 +599,8 @@ static MunitResult test_rotate_tiny(const MunitParameter params[],
 
     /* max_size = 1 byte → every message triggers rotation!
      * Keep 3 backups. */
+    log_clear_callbacks();
+    g_capture_installed = 0;
     int rc = log_add_rotate_file(base_path, LOG_INFO, 1, 3);
     munit_assert_int(rc, ==, 0);
 
