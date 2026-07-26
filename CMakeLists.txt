@@ -4,8 +4,8 @@ project(logger
     # LANGUAGES C
 )
 
-# set(CMAKE_C_STANDARD 11)
-# set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Include directories
 set(LOG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
