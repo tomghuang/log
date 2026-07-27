@@ -31,9 +31,6 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #define _AMD64_
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <debugapi.h>
 #include <winsock2.h>
 #else
 #include <pthread.h>
