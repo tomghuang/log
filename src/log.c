@@ -308,18 +308,17 @@ void log_output(int verbosity, const char* fmt, ...) {
 }
 
 int log_add_callback(log_log_cb fn, void* udata, int level) {
-    for (int i = 0; i < MAX_CALLBACKS; i++) {
-        if (!L.callbacks[i].fn) {
-            L.callbacks[i] = (callback_t){fn, udata, level};
-            return 0;
-        }
+    if (L.callback_count >= MAX_CALLBACKS) {
+        return -1;
     }
-    return -1;
+    L.callbacks[L.callback_count] = (callback_t){fn, udata, level};
+    L.callback_count++;
+    return 0;
 }
 
 void log_clear_callbacks(void) {
     lock();
-    for (int i = 0; i < MAX_CALLBACKS; i++) {
+    for (int i = 0; i < L.callback_count; i++) {
         L.callbacks[i].fn = NULL;
         L.callbacks[i].udata = NULL;
         L.callbacks[i].level = 0;
@@ -371,7 +370,7 @@ void log_log(int level, const char* file, int line, const char* fmt, ...) {
         va_end(ev.ap);
     }
 
-    for (int i = 0; i < MAX_CALLBACKS && L.callbacks[i].fn; i++) {
+    for (int i = 0; i < L.callback_count; i++) {
         callback_t* cb = &L.callbacks[i];
         if (level >= cb->level) {
             init_event(&ev, cb->udata);
