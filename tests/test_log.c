@@ -6,8 +6,8 @@
  *   ./tests/test_log
  */
 
-#include "log.h"
-#include "munit.h"
+#include <log.h>
+#include <munit.h>
 
 #include <stdio.h>
 #include <stdlib.h>
