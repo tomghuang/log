@@ -1,53 +1,27 @@
 cmake_minimum_required(VERSION 3.10)
 project(logger)
 
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-
-# Include directories
-set(LOG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-
-# Library target
-add_library(log STATIC log.c)
-target_include_directories(log PUBLIC ${LOG_INCLUDE_DIR})
-
-# Suppress MSVC deprecation warnings for fopen, strerror, localtime, etc.
-if(MSVC)
-    target_compile_definitions(log PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
-
 # Example executable
-add_executable(log_example example.c)
-target_link_libraries(log_example PRIVATE log)
+add_executable(log_example
+  example.c
+  log.c
+)
 
 # Tests (optional, enabled by default)
 option(BUILD_TESTS "Build unit tests" ON)
 if(BUILD_TESTS)
-    enable_testing()
+  enable_testing()
 
-    # Build the munit library from source
-    add_library(munit STATIC tests/munit-0.2.0/munit.c)
-    target_include_directories(munit PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tests/munit-0.2.0)
+  add_executable(test_log
+    log.c
+    tests/test_log.c
+    tests/munit-0.2.0/munit.c
+  )
 
-    # On MSVC, don't enforce C11 for munit — MSVC's default C mode doesn't define
-    # __STDC_VERSION__, so MUNIT_ARRAY_PARAM expands to nothing, avoiding VLA-style
-    # array parameter syntax that MSVC's C compiler doesn't support.
-    if(MSVC)
-        set_target_properties(munit PROPERTIES C_STANDARD 90 C_STANDARD_REQUIRED OFF)
-    endif()
+  target_include_directories(test_log PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/munit-0.2.0
+  )
 
-    # Test executable
-    add_executable(test_log tests/test_log.c)
-    # Suppress MSVC deprecation warnings for test_log (strncpy, fileno, etc.)
-    if(MSVC)
-        target_compile_definitions(test_log PRIVATE
-            _CRT_SECURE_NO_WARNINGS
-            _CRT_NONSTDC_NO_DEPRECATE
-        )
-    endif()
-
-    target_link_libraries(test_log PRIVATE log munit)
-
-    # Register test with CTest
-    add_test(NAME test_log COMMAND test_log)
+  add_test(NAME test_log COMMAND test_log)
 endif()
