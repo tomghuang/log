@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(logger)
 
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
 # Example executable
 add_executable(log_example
   example.c
