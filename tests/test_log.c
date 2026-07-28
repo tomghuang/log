@@ -19,6 +19,22 @@
 #include <process.h>
 #endif
 
+/*
+ * Platform-safe wrappers for MSVC-deprecated POSIX/CRT names.
+ * Avoids _CRT_SECURE_NO_WARNINGS / _CRT_NONSTDC_NO_DEPRECATE.
+ */
+#if defined(_MSC_VER)
+#define p_getpid()      _getpid()
+#define p_dup2(a, b)    _dup2(a, b)
+#define p_close(fd)     _close(fd)
+#define p_fileno(s)     _fileno(s)
+#else
+#define p_getpid()      getpid()
+#define p_dup2(a, b)    dup2(a, b)
+#define p_close(fd)     close(fd)
+#define p_fileno(s)     fileno(s)
+#endif
+
 /* ------------------------------------------------------------------
  * Capture callback — stores the last event for inspection
  * ------------------------------------------------------------------ */
@@ -37,8 +53,12 @@ static void capture_cb(log_event_t *ev) {
     g_capture.last_level = ev->level;
     g_capture.last_line  = ev->line;
     if (ev->file) {
+#if defined(_MSC_VER)
+        strncpy_s(g_capture.last_file, sizeof(g_capture.last_file), ev->file, _TRUNCATE);
+#else
         strncpy(g_capture.last_file, ev->file, sizeof(g_capture.last_file) - 1);
         g_capture.last_file[sizeof(g_capture.last_file) - 1] = '\0';
+#endif
     }
     vsnprintf(g_capture.last_msg, sizeof(g_capture.last_msg), ev->fmt, ev->ap);
 }
@@ -96,9 +116,9 @@ static const char *tmp_path(void) {
     static int counter = 0;
     static char buf[128];
 #ifdef _WIN32
-    snprintf(buf, sizeof(buf), "log_test_%d_%d.log", (int)getpid(), counter++);
+    snprintf(buf, sizeof(buf), "log_test_%d_%d.log", (int)p_getpid(), counter++);
 #else
-    snprintf(buf, sizeof(buf), "/tmp/log_test_%d_%d.log", (int)getpid(), counter++);
+    snprintf(buf, sizeof(buf), "/tmp/log_test_%d_%d.log", (int)p_getpid(), counter++);
 #endif
     return buf;
 }
@@ -137,7 +157,7 @@ static MunitResult test_set_level(const MunitParameter params[],
     FILE *err_fp = fopen(err_path, "w");
     munit_assert_not_null(err_fp);
 
-    int orig_stderr = dup(fileno(stderr));
+    int orig_stderr = dup(p_fileno(stderr));
     munit_assert_int(orig_stderr, >, 0);
 
     /* Set level to WARN so only WARN/ERROR/FATAL go to stderr */
@@ -145,7 +165,7 @@ static MunitResult test_set_level(const MunitParameter params[],
     log_set_quiet(false);
 
     fflush(stderr);
-    dup2(fileno(err_fp), fileno(stderr));
+    p_dup2(p_fileno(err_fp), p_fileno(stderr));
     fclose(err_fp);
 
     log_trace("should NOT appear");
@@ -157,8 +177,8 @@ static MunitResult test_set_level(const MunitParameter params[],
 
     /* Restore stderr */
     fflush(stderr);
-    dup2(orig_stderr, fileno(stderr));
-    close(orig_stderr);
+    p_dup2(orig_stderr, p_fileno(stderr));
+    p_close(orig_stderr);
 
     /* Verify only WARN+ messages appear */
     char *content = slurp_file(err_path);
@@ -268,15 +288,15 @@ static MunitResult test_log_output(const MunitParameter params[],
     FILE *err_fp = fopen(err_path, "w");
     munit_assert_not_null(err_fp);
 
-    int orig_stdout = dup(fileno(stdout));
-    int orig_stderr = dup(fileno(stderr));
+    int orig_stdout = dup(p_fileno(stdout));
+    int orig_stderr = dup(p_fileno(stderr));
     munit_assert_int(orig_stdout, >, 0);
     munit_assert_int(orig_stderr, >, 0);
 
     fflush(stdout);
     fflush(stderr);
-    dup2(fileno(out_fp), fileno(stdout));
-    dup2(fileno(err_fp), fileno(stderr));
+    p_dup2(p_fileno(out_fp), p_fileno(stdout));
+    p_dup2(p_fileno(err_fp), p_fileno(stderr));
     fclose(out_fp);
     fclose(err_fp);
 
@@ -289,10 +309,10 @@ static MunitResult test_log_output(const MunitParameter params[],
     /* Restore stdout/stderr */
     fflush(stdout);
     fflush(stderr);
-    dup2(orig_stdout, fileno(stdout));
-    dup2(orig_stderr, fileno(stderr));
-    close(orig_stdout);
-    close(orig_stderr);
+    p_dup2(orig_stdout, p_fileno(stdout));
+    p_dup2(orig_stderr, p_fileno(stderr));
+    p_close(orig_stdout);
+    p_close(orig_stderr);
 
     /* Read captured stdout */
     char *out_content = slurp_file(out_path);
@@ -721,10 +741,10 @@ static MunitResult test_log_data(const MunitParameter params[],
     FILE *out_fp = fopen(data_path, "w");
     munit_assert_not_null(out_fp);
 
-    int orig_stdout = dup(fileno(stdout));
+    int orig_stdout = dup(p_fileno(stdout));
     munit_assert_int(orig_stdout, >, 0);
     fflush(stdout);
-    dup2(fileno(out_fp), fileno(stdout));
+    p_dup2(p_fileno(out_fp), p_fileno(stdout));
     fclose(out_fp);
 
     /* Call log_data */
@@ -733,8 +753,8 @@ static MunitResult test_log_data(const MunitParameter params[],
 
     /* Restore stdout */
     fflush(stdout);
-    dup2(orig_stdout, fileno(stdout));
-    close(orig_stdout);
+    p_dup2(orig_stdout, p_fileno(stdout));
+    p_close(orig_stdout);
 
     /* Verify */
     char *content = slurp_file(data_path);

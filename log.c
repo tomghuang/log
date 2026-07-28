@@ -36,6 +36,33 @@
 #include <pthread.h>
 #endif /* defined(_WIN32) || defined(_WIN64) */
 
+/*
+ * Platform-safe wrappers for MSVC-deprecated CRT functions.
+ * Instead of suppressing C4996 with _CRT_SECURE_NO_WARNINGS,
+ * we use the _s variants on MSVC and fall back to POSIX elsewhere.
+ */
+#if defined(_MSC_VER)
+static FILE *safe_fopen(const char *path, const char *mode) {
+    FILE *fp = NULL;
+    fopen_s(&fp, path, mode);
+    return fp;
+}
+static const char *safe_strerror(int errnum) {
+    static char buf[256];
+    strerror_s(buf, sizeof(buf), errnum);
+    return buf;
+}
+static struct tm *safe_localtime(const time_t *t) {
+    static struct tm result;
+    localtime_s(&result, t);
+    return &result;
+}
+#else
+#define safe_fopen(path, mode)  fopen(path, mode)
+#define safe_strerror(errnum)   strerror(errnum)
+#define safe_localtime(t)       localtime(t)
+#endif
+
 #define MAX_CALLBACKS 32
 
 typedef struct callback {
@@ -114,7 +141,7 @@ static void backup_file_name(const char* basename, unsigned char index, char* bu
 }
 
 static int is_file_exist(const char* filename) {
-    FILE* fp = fopen(filename, "rb");
+    FILE* fp = safe_fopen(filename, "rb");
     if (fp == NULL) {
         return 0;
     } else {
@@ -149,7 +176,7 @@ static int rotate_files(log_event_t* ev) {
         }
     }
 
-    ev->udata = fopen(L.filename, "ab");
+    ev->udata = safe_fopen(L.filename, "ab");
     if (ev->udata == NULL) {
         fprintf(stderr, "ERROR: logger: Failed to open file: `%s`\n", ev->file);
         return 1;
@@ -182,7 +209,7 @@ static void rotate_file_callback(log_event_t* ev) {
     size_t total_size = 0;
     int size = fprintf(ev->udata, "%s %-5s %s:%d: ", buf, level_strings[ev->level], ev->file, ev->line);
     if (size == -1) {
-        printf("fail: %s\n", strerror(errno));
+        printf("fail: %s\n", safe_strerror(errno));
         exit(1);
     }
 
@@ -336,7 +363,7 @@ int log_add_rotate_file(const char* path, int level,size_t size, size_t n) {
     L.max_file_size = size;
     L.max_file_count = n;
 
-    FILE* fp = fopen(path, "ab");
+    FILE* fp = safe_fopen(path, "ab");
     if (fp == NULL) {
         return -1;
     }
@@ -348,7 +375,7 @@ int log_add_rotate_file(const char* path, int level,size_t size, size_t n) {
 static void init_event(log_event_t* ev, void* udata) {
     if (!ev->time) {
         time_t t = time(NULL);
-        ev->time = localtime(&t);
+        ev->time = safe_localtime(&t);
     }
     ev->udata = udata;
 }
